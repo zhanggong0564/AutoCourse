@@ -1,28 +1,28 @@
-# Classic Desktop UI Implementation Plan
+# 经典桌面界面实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **执行要求：** 必须使用 `superpowers:subagent-driven-development`（推荐）或 `superpowers:executing-plans`，逐项执行本计划。各步骤使用复选框（`- [ ]`）跟踪进度。
 
-**Goal:** Replace the current plain Tkinter layout with the approved compact Windows desktop-tool interface while preserving all course automation behavior.
+**目标：** 在保留全部看课自动化行为的前提下，将当前朴素的 Tkinter 布局替换为已确认的紧凑型 Windows 桌面工具界面。
 
-**Architecture:** Keep `App` as the GUI controller and retain its existing worker threads and event queue. Add small pure functions for status presentation so color and text behavior can be tested without creating a Tk window, then rebuild only `_build`, banner presentation, and log visibility around those functions.
+**架构：** 继续由 `App` 负责 GUI 控制，并保留现有后台线程和事件队列。增加小型纯函数描述状态的颜色与文字，使其无需创建 Tk 窗口即可测试；随后只围绕这些函数重构 `_build`、提示横幅和日志显示逻辑。
 
-**Tech Stack:** Python 3, Tkinter/ttk, pytest
+**技术栈：** Python 3、Tkinter/ttk、pytest
 
 ---
 
-## File Structure
+## 文件结构
 
-- Modify `app.py`: add presentation helpers, ttk styles, menu/toolbar, overview panel, collapsible log panel, and status bar.
-- Modify `tests/test_app_runtime.py`: cover status presentation and log toggle text in addition to existing runtime button behavior.
-- Modify `README.md`: describe the compact toolbar and collapsible log interaction.
+- 修改 `app.py`：增加展示辅助函数、ttk 样式、菜单与工具栏、概览面板、可折叠日志面板和状态栏。
+- 修改 `tests/test_app_runtime.py`：在现有运行时按钮行为测试之外，覆盖状态展示和日志切换文字。
+- 修改 `README.md`：说明紧凑工具栏和日志折叠交互。
 
-### Task 1: Test the UI presentation model
+### 任务 1：测试界面展示模型
 
-**Files:**
-- Modify: `tests/test_app_runtime.py`
-- Modify: `app.py`
+**涉及文件：**
+- 修改：`tests/test_app_runtime.py`
+- 修改：`app.py`
 
-- [ ] **Step 1: Write failing status presentation tests**
+- [ ] **步骤 1：编写失败的状态展示测试**
 
 Add imports and tests:
 
@@ -48,13 +48,13 @@ def test_log_toggle_text_matches_visibility():
     assert log_toggle_text(True) == "隐藏详细日志 ▲"
 ```
 
-- [ ] **Step 2: Run the tests and verify RED**
+- [ ] **步骤 2：运行测试并确认处于红灯阶段**
 
-Run: `python -m pytest tests/test_app_runtime.py -v`
+运行：`python -m pytest tests/test_app_runtime.py -v`
 
-Expected: collection fails because `status_presentation` and `log_toggle_text` do not exist.
+预期：测试收集失败，因为 `status_presentation` 和 `log_toggle_text` 尚不存在。
 
-- [ ] **Step 3: Implement the minimal pure helpers**
+- [ ] **步骤 3：实现最小化纯辅助函数**
 
 Add near `runtime_button_state` in `app.py`:
 
@@ -73,25 +73,25 @@ def log_toggle_text(visible: bool):
     return "隐藏详细日志 ▲" if visible else "显示详细日志 ▼"
 ```
 
-- [ ] **Step 4: Run the focused tests and verify GREEN**
+- [ ] **步骤 4：运行专项测试并确认处于绿灯阶段**
 
-Run: `python -m pytest tests/test_app_runtime.py -v`
+运行：`python -m pytest tests/test_app_runtime.py -v`
 
-Expected: all tests in the file pass.
+预期：该文件中的全部测试通过。
 
-- [ ] **Step 5: Commit the presentation model**
+- [ ] **步骤 5：提交界面展示模型**
 
 ```powershell
 git add -- app.py tests/test_app_runtime.py
 git commit -m "feat(service): 添加界面状态展示模型"
 ```
 
-### Task 2: Build the classic desktop shell
+### 任务 2：构建经典桌面界面框架
 
-**Files:**
-- Modify: `app.py`
+**涉及文件：**
+- 修改：`app.py`
 
-- [ ] **Step 1: Configure compact ttk styles**
+- [ ] **步骤 1：配置紧凑型 ttk 样式**
 
 Add `_configure_styles` and call it before `_build`:
 
@@ -106,11 +106,11 @@ def _configure_styles(self):
     style.configure("Panel.TLabelframe.Label", foreground="#294967")
 ```
 
-- [ ] **Step 2: Add the menu bar**
+- [ ] **步骤 2：增加菜单栏**
 
-Create `_build_menu` with File, Run, Tools, and Help menus. Wire commands to existing `start`, `confirm_login`, `stop`, `open_config`, and `install_runtime` methods. Add `open_log_folder` using `os.startfile(ROOT / "logs")`; create the logs directory first with `mkdir(parents=True, exist_ok=True)`.
+创建 `_build_menu`，包含文件、运行、工具和帮助菜单。菜单命令连接到现有的 `start`、`confirm_login`、`stop`、`open_config` 和 `install_runtime` 方法。增加 `open_log_folder`，通过 `os.startfile(ROOT / "logs")` 打开日志目录；打开前使用 `mkdir(parents=True, exist_ok=True)` 创建目录。
 
-- [ ] **Step 3: Replace `_build` with desktop regions**
+- [ ] **步骤 3：用桌面工具区域重构 `_build`**
 
 Construct these widgets in order:
 
@@ -137,38 +137,38 @@ self.status_bar.pack(fill="x", side="bottom")
 
 Use a compact horizontal toolbar. Keep references to all existing buttons so runtime and worker-state methods continue to configure them.
 
-- [ ] **Step 4: Add overview and status fields**
+- [ ] **步骤 4：增加运行概览与状态字段**
 
 Use `StringVar` values for current status, component state, and current task. Display the status in a colored `tk.Label` and update it from `_apply_status_presentation`. Keep `status_var` as the source of truth for compatibility with the existing event loop.
 
-- [ ] **Step 5: Run syntax and focused regression checks**
+- [ ] **步骤 5：运行语法检查和专项回归测试**
 
-Run:
+运行：
 
 ```powershell
 python -m py_compile app.py
 python -m pytest tests/test_app_runtime.py -v
 ```
 
-Expected: compilation succeeds and focused tests pass.
+预期：编译成功，专项测试全部通过。
 
-- [ ] **Step 6: Commit the desktop shell**
+- [ ] **步骤 6：提交桌面界面框架**
 
 ```powershell
 git add -- app.py
 git commit -m "feat(service): 重构经典桌面工具界面"
 ```
 
-### Task 3: Add collapsible logs and state colors
+### 任务 3：增加可折叠日志和状态配色
 
-**Files:**
-- Modify: `app.py`
+**涉及文件：**
+- 修改：`app.py`
 
-- [ ] **Step 1: Initialize collapsed log state**
+- [ ] **步骤 1：初始化日志折叠状态**
 
 Set `self.log_visible = False` before `_build`. Place `log_box` inside `self.log_body`, but do not pack `log_body` during initial construction.
 
-- [ ] **Step 2: Implement the toggle behavior**
+- [ ] **步骤 2：实现日志展开和收起行为**
 
 ```python
 def toggle_log(self):
@@ -182,7 +182,7 @@ def toggle_log(self):
 
 Keep inserting every log event into `log_box` even when `log_body` is hidden. Update a `last_activity_var` with the newest log line.
 
-- [ ] **Step 3: Apply state colors from the presentation model**
+- [ ] **步骤 3：根据展示模型应用状态配色**
 
 Add a palette:
 
@@ -197,34 +197,34 @@ STATUS_COLORS = {
 
 `_apply_status_presentation` must set the status label text, foreground, background, and highlight color, and mirror the text to the bottom status bar.
 
-- [ ] **Step 4: Restyle the manual-action banner**
+- [ ] **步骤 4：重做人工处理提示横幅样式**
 
 Keep `_update_banner` conditions unchanged. Use a pale red background and dark red text instead of a full red strip. Pack it above the overview panel, and hide it for all other states.
 
-- [ ] **Step 5: Verify focused behavior**
+- [ ] **步骤 5：验证专项行为**
 
-Run:
+运行：
 
 ```powershell
 python -m py_compile app.py
 python -m pytest tests/test_app_runtime.py -v
 ```
 
-Expected: compilation succeeds and all focused tests pass.
+预期：编译成功，全部专项测试通过。
 
-- [ ] **Step 6: Commit log and color behavior**
+- [ ] **步骤 6：提交日志折叠和状态配色**
 
 ```powershell
 git add -- app.py
 git commit -m "feat(service): 增加折叠日志与状态配色"
 ```
 
-### Task 4: Document and verify the finished interface
+### 任务 4：补充文档并验证最终界面
 
-**Files:**
-- Modify: `README.md`
+**涉及文件：**
+- 修改：`README.md`
 
-- [ ] **Step 1: Update usage documentation**
+- [ ] **步骤 1：更新使用说明**
 
 Add a short interface section explaining:
 
@@ -237,15 +237,15 @@ Add a short interface section explaining:
 - 底部状态栏持续显示运行状态和日志位置。
 ```
 
-- [ ] **Step 2: Run the full test suite**
+- [ ] **步骤 2：运行完整测试套件**
 
-Run: `python -m pytest -v`
+运行：`python -m pytest -v`
 
-Expected: all tests pass with zero failures.
+预期：全部测试通过，失败数为零。
 
-- [ ] **Step 3: Launch the application for visual verification**
+- [ ] **步骤 3：启动应用并进行视觉验证**
 
-Run: `python app.py`
+运行：`python app.py`
 
 Verify manually:
 
@@ -256,20 +256,20 @@ Verify manually:
 - Resizing the window expands the log text area when visible.
 - Waiting-answer status shows the pale red banner.
 
-- [ ] **Step 4: Commit documentation**
+- [ ] **步骤 4：提交使用文档**
 
 ```powershell
 git add -- README.md
 git commit -m "docs(docs): 更新桌面界面使用说明"
 ```
 
-- [ ] **Step 5: Inspect final repository state**
+- [ ] **步骤 5：检查最终仓库状态**
 
-Run:
+运行：
 
 ```powershell
 git status --short
 git log -6 --oneline
 ```
 
-Expected: no unintended changes; commits each contain one scope and responsibility.
+预期：没有非预期改动，每个提交只包含一个范围和一项职责。
