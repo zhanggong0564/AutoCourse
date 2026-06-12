@@ -27,6 +27,7 @@ exe = EXE(
     analysis.datas,
     [],
     name="自动看课助手",
+    icon="assets/icon.ico",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
