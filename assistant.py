@@ -11,11 +11,13 @@ import browser
 import notifier
 import page_actions
 import page_logic
+import runtime_installer
 
 
 class Assistant:
     def __init__(self, root: Path, log, status):
         self.root = root
+        self.browser_dir = runtime_installer.configure_browser_path(root)
         self.log = log
         self.status = status
         self.stop_event = threading.Event()

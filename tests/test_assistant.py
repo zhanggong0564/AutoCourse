@@ -1,4 +1,5 @@
 import page_actions
+import runtime_installer
 from assistant import Assistant
 
 
@@ -26,3 +27,17 @@ def test_find_course_waits_for_async_list_data(monkeypatch):
 
     assert result is target
     assert page.waits == [500, 500]
+
+
+def test_assistant_configures_shared_browser_runtime(tmp_path, monkeypatch):
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(
+        runtime_installer,
+        "configure_browser_path",
+        lambda root: calls.append(root) or root / "runtime" / "ms-playwright",
+    )
+
+    Assistant(tmp_path, lambda message: None, lambda status: None)
+
+    assert calls == [tmp_path]
