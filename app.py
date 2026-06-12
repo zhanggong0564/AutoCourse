@@ -26,6 +26,20 @@ def runtime_button_state(installed: bool, installing: bool):
     return "disabled", "normal", "需要安装浏览器组件"
 
 
+def status_presentation(status: str):
+    if status in ("等待答题", "等待人工处理", "运行失败"):
+        return "danger", f"● {status}"
+    if status in ("就绪", "运行正常"):
+        return "success", f"● {status}"
+    if "登录" in status:
+        return "warning", f"● {status}"
+    return "info", f"● {status}"
+
+
+def log_toggle_text(visible: bool):
+    return "隐藏详细日志 ▲" if visible else "显示详细日志 ▼"
+
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
