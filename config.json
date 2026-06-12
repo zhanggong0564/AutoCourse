@@ -5,7 +5,7 @@
   "profile_dir": ".browser-profile",
   "poll_seconds": 5,
   "stuck_minutes": 5,
-  "debug": true,
+  "debug": false,
   "login_keywords": [
     "培训",
     "课程",
