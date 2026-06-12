@@ -66,7 +66,6 @@ class Assistant:
         # 以用户点“我已登录”时所在的页面作为课程列表页；看完课后回到这里，
         # 不再强制跳回仪表盘 start_url（那只是个人主页，不含课程列表）。
         list_url = list_page.url
-        self.log(f"课程列表页：{list_url}")
         attempted: set[str] = set()
         while not self.stop_event.is_set():
             self.status("查找未完成课程")
@@ -97,14 +96,10 @@ class Assistant:
 
             if new_pages:
                 course_page = new_pages[-1]
-                self.log(f"课程在新标签打开：{course_page.url}")
             elif list_page.url != before_url:
                 course_page = list_page
-                self.log(f"课程在当前标签打开：{list_page.url}")
             elif self._content_changed(list_page, before_text):
-                # 单页应用：URL 不变但页面内容已切换（出现视频或文本大幅变化）
                 course_page = list_page
-                self.log("课程在当前页面内打开（单页应用，URL 未变）。")
             else:
                 self.log("点击后页面无变化（可能没点中真正的课程入口），跳过该项。")
                 continue
@@ -180,8 +175,6 @@ class Assistant:
                 self.log(f"播放器报错：{player_error}")
 
             page_actions.play_videos(page)
-            if not page_actions.has_video(page):
-                self.log("页面暂无可播放的 video 元素（可能需点击播放按钮启动）。")
 
             # 卡住判断以视频实际播放秒数为准（页面百分比每 300 秒才更新，不可靠）
             video_time = page_actions.video_current_time(page)
