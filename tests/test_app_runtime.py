@@ -1,6 +1,8 @@
 from app import (
     centered_geometry,
     enable_dpi_awareness,
+    log_line_kind,
+    log_overflow,
     log_toggle_text,
     runtime_button_state,
     scaled_size,
@@ -68,3 +70,25 @@ def test_centered_geometry_centers_horizontally():
 
 def test_centered_geometry_clamps_to_screen_origin():
     assert centered_geometry(2000, 1500, 1920, 1080) == "2000x1500+0+0"
+
+
+def test_log_line_kind_flags_errors():
+    assert log_line_kind("运行失败：超时") == "error"
+    assert log_line_kind("浏览器组件安装失败：网络错误") == "error"
+
+
+def test_log_line_kind_flags_warnings():
+    assert log_line_kind("等待答题，请到浏览器手动处理") == "warning"
+    assert log_line_kind("已暂停播放") == "warning"
+
+
+def test_log_line_kind_defaults_to_info():
+    assert log_line_kind("开始播放第 3 课") == "info"
+
+
+def test_log_overflow_below_limit_is_zero():
+    assert log_overflow(1000, 1000) == 0
+
+
+def test_log_overflow_counts_excess_lines():
+    assert log_overflow(1003, 1000) == 3

@@ -31,6 +31,21 @@ STATUS_COLORS = {
     "danger": ("#fbeceb", "#a13a32", "#e3b9b6"),
 }
 
+LOG_MAX_LINES = 1000
+LOG_LINE_COLORS = {"error": "#a13a32", "warning": "#8a6d1f"}
+
+
+def log_line_kind(message: str) -> str:
+    if any(word in message for word in ("失败", "错误", "异常")):
+        return "error"
+    if any(word in message for word in ("等待", "暂停", "请")):
+        return "warning"
+    return "info"
+
+
+def log_overflow(total_lines: int, max_lines: int = LOG_MAX_LINES) -> int:
+    return max(total_lines - max_lines, 0)
+
 
 def enable_dpi_awareness():
     """启用 Windows DPI 感知，高分屏下界面不再发虚；失败时静默降级。"""
@@ -328,6 +343,8 @@ class App(tk.Tk):
         scrollbar.configure(command=self.log_box.yview)
         scrollbar.pack(side="right", fill="y")
         self.log_box.pack(side="left", fill="both", expand=True)
+        for tag, color in LOG_LINE_COLORS.items():
+            self.log_box.tag_configure(tag, foreground=color)
 
     def _build_status_bar(self):
         bar = tk.Frame(self, bg="#dce5ee", height=26, highlightthickness=0)
@@ -424,6 +441,20 @@ class App(tk.Tk):
         self.footer_component_var.set(component)
         self._apply_status_presentation(status)
 
+    def _append_log(self, message):
+        self.log_box.configure(state="normal")
+        self.log_box.insert(
+            "end",
+            time.strftime("[%H:%M:%S] ") + message + "\n",
+            log_line_kind(message),
+        )
+        total_lines = int(self.log_box.index("end-1c").split(".")[0]) - 1
+        overflow = log_overflow(total_lines)
+        if overflow:
+            self.log_box.delete("1.0", f"{overflow + 1}.0")
+        self.log_box.see("end")
+        self.log_box.configure(state="disabled")
+
     def log(self, message):
         self.logger.info(message)
         self.events.put(("log", message))
@@ -439,10 +470,7 @@ class App(tk.Tk):
             except queue.Empty:
                 break
             if kind == "log":
-                self.log_box.configure(state="normal")
-                self.log_box.insert("end", time.strftime("[%H:%M:%S] ") + value + "\n")
-                self.log_box.see("end")
-                self.log_box.configure(state="disabled")
+                self._append_log(value)
                 self.last_activity_var.set(f"最近活动：{value}")
             elif kind == "status":
                 self.status_var.set(value)
