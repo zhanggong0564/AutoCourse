@@ -1,4 +1,10 @@
-from app import log_toggle_text, runtime_button_state, status_presentation
+from app import (
+    enable_dpi_awareness,
+    log_toggle_text,
+    runtime_button_state,
+    scaled_size,
+    status_presentation,
+)
 
 
 def test_runtime_state_when_missing():
@@ -37,3 +43,19 @@ def test_status_presentation_for_processing_and_failure():
 def test_log_toggle_text_matches_visibility():
     assert log_toggle_text(False) == "显示详细日志 ▼"
     assert log_toggle_text(True) == "隐藏详细日志 ▲"
+
+
+def test_scaled_size_scales_dimensions():
+    assert scaled_size(780, 500, 1.5) == (1170, 750)
+
+
+def test_scaled_size_never_shrinks_below_base():
+    assert scaled_size(780, 500, 0.8) == (780, 500)
+
+
+def test_scaled_size_caps_extreme_factor():
+    assert scaled_size(100, 100, 10.0) == (300, 300)
+
+
+def test_enable_dpi_awareness_does_not_raise():
+    enable_dpi_awareness()

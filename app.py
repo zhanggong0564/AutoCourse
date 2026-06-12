@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import os
 import queue
 import threading
@@ -23,6 +24,22 @@ STATUS_COLORS = {
     "warning": ("#fff8e6", "#715b20", "#e6d29b"),
     "danger": ("#fbeceb", "#a13a32", "#e3b9b6"),
 }
+
+
+def enable_dpi_awareness():
+    """启用 Windows DPI 感知，高分屏下界面不再发虚；失败时静默降级。"""
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+
+def scaled_size(width: int, height: int, factor: float):
+    factor = max(1.0, min(factor, 3.0))
+    return round(width * factor), round(height * factor)
 
 
 def runtime_button_state(installed: bool, installing: bool):
@@ -51,8 +68,12 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("自动看课助手")
-        self.geometry("780x500")
-        self.minsize(720, 430)
+        dpi = self.winfo_fpixels("1i")
+        self.tk.call("tk", "scaling", dpi / 72.0)
+        self._ui_scale = dpi / 96.0
+        width, height = scaled_size(780, 500, self._ui_scale)
+        self.geometry(f"{width}x{height}")
+        self.minsize(*scaled_size(720, 430, self._ui_scale))
         self.configure(bg="#eef2f6")
         self.events = queue.Queue()
         self.worker = None
@@ -478,4 +499,5 @@ class App(tk.Tk):
 
 
 if __name__ == "__main__":
+    enable_dpi_awareness()
     App().mainloop()
