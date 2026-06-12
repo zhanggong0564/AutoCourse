@@ -1,0 +1,8 @@
+.browser-profile/
+.pytest_cache/
+.venv/
+debug-*.html
+__pycache__/
+*.pyc
+logs/
+.terminal_probe
