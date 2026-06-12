@@ -1,4 +1,5 @@
 from app import (
+    centered_geometry,
     enable_dpi_awareness,
     log_toggle_text,
     runtime_button_state,
@@ -59,3 +60,11 @@ def test_scaled_size_caps_extreme_factor():
 
 def test_enable_dpi_awareness_does_not_raise():
     enable_dpi_awareness()
+
+
+def test_centered_geometry_centers_horizontally():
+    assert centered_geometry(800, 500, 1920, 1080) == "800x500+560+232"
+
+
+def test_centered_geometry_clamps_to_screen_origin():
+    assert centered_geometry(2000, 1500, 1920, 1080) == "2000x1500+0+0"

@@ -18,6 +18,12 @@ ROOT = runtime_installer.application_root()
 runtime_installer.prepare_application_root(RESOURCE_ROOT, ROOT)
 CONFIG_PATH = ROOT / "config.json"
 
+APP_ICON_PNGS = (
+    "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAN0lEQVR42mNggALL6v3/ScEMyIBUzSiGkKsZbsgwNwAGKDYAnyFEG4DLIPq4YLinA4ozE6XZGQDQdGvd6ZELaQAAAABJRU5ErkJggg==",
+    "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAa0lEQVR42mNgwAIsq/f/pwVmwAdoZSlRjqG35RiOGNkOGCjL4Y4YdcCoA8jRBAID7gAYGHAHUOoIqjiAEodQ1QHkOILqDiDVITRzALEOGX4hMDJzwcgsCUer41EHDIuW8WjHZPB0Tgeyew4AglrT/kuv/40AAAAASUVORK5CYII=",
+    "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA0ElEQVR42u3bwQ2DMAwF0KzV2TocoxX10F5QKxAksfGzlAH+E4LEwa3trMdzeWVa7WxlC3wZyN2CH4K4e/i/CFXC/0QoDVAt/AYBAIDCAFXDfxEAAAAAAAAAAAB6rneVB/hUeYBoENMAoiBMBYgAEQJgJkIYgFkQ4QBGI4QEGAkRGmAEQniA3hBpAHohpALoAZES4EoIT4B3gK+AfYCdoLOA06B+gI6QnqCusHsBN0PuBgEAAAAAAAD/C/tbHAAAc0OmxswOmh6tF97wdMHx+RUoDcDKtVxVKQAAAABJRU5ErkJggg==",
+)
+
 STATUS_COLORS = {
     "success": ("#e6f4ec", "#18734b", "#b9dfca"),
     "info": ("#e8f1fb", "#295f96", "#bfd2e8"),
@@ -40,6 +46,12 @@ def enable_dpi_awareness():
 def scaled_size(width: int, height: int, factor: float):
     factor = max(1.0, min(factor, 3.0))
     return round(width * factor), round(height * factor)
+
+
+def centered_geometry(width: int, height: int, screen_width: int, screen_height: int):
+    x = max((screen_width - width) // 2, 0)
+    y = max((screen_height - height) * 2 // 5, 0)
+    return f"{width}x{height}+{x}+{y}"
 
 
 def runtime_button_state(installed: bool, installing: bool):
@@ -72,7 +84,13 @@ class App(tk.Tk):
         self.tk.call("tk", "scaling", dpi / 72.0)
         self._ui_scale = dpi / 96.0
         width, height = scaled_size(780, 500, self._ui_scale)
-        self.geometry(f"{width}x{height}")
+        self.geometry(
+            centered_geometry(
+                width, height, self.winfo_screenwidth(), self.winfo_screenheight()
+            )
+        )
+        self._icon_images = [tk.PhotoImage(data=png) for png in APP_ICON_PNGS]
+        self.iconphoto(True, *self._icon_images)
         self.minsize(*scaled_size(720, 430, self._ui_scale))
         self.configure(bg="#eef2f6")
         self.events = queue.Queue()
