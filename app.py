@@ -47,6 +47,23 @@ def log_overflow(total_lines: int, max_lines: int = LOG_MAX_LINES) -> int:
     return max(total_lines - max_lines, 0)
 
 
+MANUAL_STATUSES = ("等待答题", "等待人工处理")
+
+
+class FLASHWINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.c_uint),
+        ("hwnd", ctypes.c_void_p),
+        ("dwFlags", ctypes.c_uint),
+        ("uCount", ctypes.c_uint),
+        ("dwTimeout", ctypes.c_uint),
+    ]
+
+
+def should_flash(status: str) -> bool:
+    return status in MANUAL_STATUSES
+
+
 def enable_dpi_awareness():
     """启用 Windows DPI 感知，高分屏下界面不再发虚；失败时静默降级。"""
     try:
@@ -501,10 +518,27 @@ class App(tk.Tk):
                 self._apply_runtime_state()
         self.after(100, self._drain_events)
 
+    def _flash_taskbar(self):
+        """任务栏闪烁直至窗口获得焦点；非 Windows 平台静默跳过。"""
+        try:
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+            flashw_all, flashw_timernofg = 0x3, 0xC
+            info = FLASHWINFO(
+                ctypes.sizeof(FLASHWINFO),
+                hwnd,
+                flashw_all | flashw_timernofg,
+                0,
+                0,
+            )
+            ctypes.windll.user32.FlashWindowEx(ctypes.byref(info))
+        except Exception:
+            pass
+
     def _update_banner(self, status):
-        if status in ("等待答题", "等待人工处理"):
+        if should_flash(status):
             self.banner.configure(text=f"⚠  {status}：请到浏览器手动处理")
             self.banner_wrap.pack(fill="x", pady=(0, 10), before=self.overview)
+            self._flash_taskbar()
         else:
             self.banner_wrap.pack_forget()
 

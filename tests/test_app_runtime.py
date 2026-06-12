@@ -6,6 +6,7 @@ from app import (
     log_toggle_text,
     runtime_button_state,
     scaled_size,
+    should_flash,
     status_presentation,
 )
 
@@ -93,3 +94,14 @@ def test_log_overflow_below_limit_is_zero():
 
 def test_log_overflow_counts_excess_lines():
     assert log_overflow(1003, 1000) == 3
+
+
+def test_should_flash_for_manual_statuses():
+    assert should_flash("等待答题") is True
+    assert should_flash("等待人工处理") is True
+
+
+def test_should_not_flash_for_normal_statuses():
+    assert should_flash("就绪") is False
+    assert should_flash("运行正常") is False
+    assert should_flash("运行失败") is False
