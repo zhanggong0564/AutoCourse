@@ -9,3 +9,4 @@ logs/
 runtime/
 build/
 dist/
+.superpowers/
