@@ -164,34 +164,34 @@ class App(tk.Tk):
         self.main = ttk.Frame(self, style="App.TFrame", padding=(14, 12, 14, 8))
         self.main.pack(fill="both", expand=True)
 
+        self.banner_wrap = tk.Frame(self.main, bg="#c0453c")
         self.banner = tk.Label(
-            self.main,
+            self.banner_wrap,
             text="",
-            fg="#a13a32",
+            fg="#8f2f27",
             bg="#fbeceb",
-            highlightbackground="#e3b9b6",
-            highlightthickness=1,
             font=("Microsoft YaHei UI", 10, "bold"),
             padx=10,
             pady=8,
             anchor="w",
         )
+        self.banner.pack(fill="x", padx=(4, 1), pady=1)
 
         self._build_overview()
 
+        hint_wrap = tk.Frame(self.main, bg="#d8b54a")
         self.hint_label = tk.Label(
-            self.main,
+            hint_wrap,
             text="提示：首次启动后，请在浏览器中手动登录。遇到答题时程序会暂停并提醒。",
             fg="#715b20",
             bg="#fff8e6",
-            highlightbackground="#e6d29b",
-            highlightthickness=1,
             font=("Microsoft YaHei UI", 9),
             padx=10,
             pady=7,
             anchor="w",
         )
-        self.hint_label.pack(fill="x", pady=(10, 0))
+        self.hint_label.pack(fill="x", padx=(4, 1), pady=1)
+        hint_wrap.pack(fill="x", pady=(10, 0))
 
         self._build_log_panel()
         self._build_status_bar()
@@ -224,7 +224,7 @@ class App(tk.Tk):
         self.configure(menu=menu)
 
     def _build_toolbar(self):
-        toolbar = ttk.Frame(self, style="Toolbar.TFrame", padding=(8, 6))
+        toolbar = ttk.Frame(self, style="Toolbar.TFrame", padding=(10, 6))
         toolbar.pack(fill="x")
 
         self.start_button = ttk.Button(
@@ -296,7 +296,7 @@ class App(tk.Tk):
 
     def _build_log_panel(self):
         self.log_panel = ttk.LabelFrame(
-            self.main, text="运行日志", style="Panel.TLabelframe", padding=(8, 6)
+            self.main, text="运行日志", style="Panel.TLabelframe", padding=(12, 8)
         )
         self.log_panel.pack(fill="x", pady=(10, 0))
 
@@ -469,9 +469,9 @@ class App(tk.Tk):
     def _update_banner(self, status):
         if status in ("等待答题", "等待人工处理"):
             self.banner.configure(text=f"⚠  {status}：请到浏览器手动处理")
-            self.banner.pack(fill="x", pady=(0, 10), before=self.overview)
+            self.banner_wrap.pack(fill="x", pady=(0, 10), before=self.overview)
         else:
-            self.banner.pack_forget()
+            self.banner_wrap.pack_forget()
 
     def _apply_status_presentation(self, status):
         kind, text = status_presentation(status)
