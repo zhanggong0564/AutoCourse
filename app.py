@@ -521,7 +521,10 @@ class App(tk.Tk):
         self.footer_status_var.set(text)
 
     def _show_log_menu(self, event):
-        self.log_menu.tk_popup(event.x_root, event.y_root)
+        try:
+            self.log_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.log_menu.grab_release()
 
     def copy_log(self):
         try:
