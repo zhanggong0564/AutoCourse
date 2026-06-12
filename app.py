@@ -36,7 +36,7 @@ LOG_LINE_COLORS = {"error": "#a13a32", "warning": "#8a6d1f"}
 
 
 def log_line_kind(message: str) -> str:
-    if any(word in message for word in ("失败", "错误", "异常")):
+    if any(word in message for word in ("失败", "错误", "异常", "报错")):
         return "error"
     if any(word in message for word in ("等待", "暂停", "请")):
         return "warning"

@@ -75,6 +75,7 @@ def test_centered_geometry_clamps_to_screen_origin():
 def test_log_line_kind_flags_errors():
     assert log_line_kind("运行失败：超时") == "error"
     assert log_line_kind("浏览器组件安装失败：网络错误") == "error"
+    assert log_line_kind("播放器报错，准备重试") == "error"
 
 
 def test_log_line_kind_flags_warnings():
