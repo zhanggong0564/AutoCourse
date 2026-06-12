@@ -10,3 +10,4 @@ runtime/
 build/
 dist/
 .superpowers/
+.worktrees/
