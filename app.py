@@ -534,6 +534,15 @@ class App(tk.Tk):
         except Exception:
             pass
 
+    def _stop_taskbar_flash(self):
+        """状态恢复后停止任务栏闪烁；窗口未在闪烁时调用无副作用。"""
+        try:
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+            info = FLASHWINFO(ctypes.sizeof(FLASHWINFO), hwnd, 0, 0, 0)
+            ctypes.windll.user32.FlashWindowEx(ctypes.byref(info))
+        except Exception:
+            pass
+
     def _update_banner(self, status):
         if should_flash(status):
             self.banner.configure(text=f"⚠  {status}：请到浏览器手动处理")
@@ -541,6 +550,7 @@ class App(tk.Tk):
             self._flash_taskbar()
         else:
             self.banner_wrap.pack_forget()
+            self._stop_taskbar_flash()
 
     def _apply_status_presentation(self, status):
         kind, text = status_presentation(status)
