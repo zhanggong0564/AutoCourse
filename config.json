@@ -1,17 +1,65 @@
 {
   "start_url": "https://www.zjzx.ah.cn/personcenter?type=train",
   "browser": "chromium",
+  "channel": "chrome",
   "profile_dir": ".browser-profile",
   "poll_seconds": 5,
   "stuck_minutes": 5,
   "debug": true,
-  "login_keywords": ["培训", "课程", "学习"],
-  "course_keywords": ["未学习", "未完成", "继续学习", "开始学习", "去学习"],
-  "video_entry_keywords": ["视频", "播放", "课件", "学习"],
-  "excluded_entry_keywords": ["考试", "答题", "测验", "考核"],
-  "completed_keywords": ["已完成", "100%"],
-  "quiz_keywords": ["答题", "测验", "试题", "提交答案", "单选题", "多选题", "请选择正确答案"],
-  "idle_popup_keywords": ["你还在吗", "继续学习", "我知道了", "继续观看", "确定"],
-  "human_keywords": ["验证码", "人脸", "活体", "拖动滑块", "确认本人"],
-  "next_section_keywords": ["下一节", "下一章", "继续学习"]
+  "login_keywords": [
+    "培训",
+    "课程",
+    "学习"
+  ],
+  "course_keywords": [
+    "未学习",
+    "未完成",
+    "继续学习",
+    "开始学习",
+    "去学习"
+  ],
+  "video_entry_keywords": [
+    "视频",
+    "播放",
+    "课件",
+    "学习"
+  ],
+  "excluded_entry_keywords": [
+    "考试",
+    "答题",
+    "测验",
+    "考核"
+  ],
+  "completed_keywords": [
+    "已完成",
+    "100%"
+  ],
+  "quiz_keywords": [
+    "答题",
+    "测验",
+    "试题",
+    "提交答案",
+    "单选题",
+    "多选题",
+    "请选择正确答案"
+  ],
+  "idle_popup_keywords": [
+    "你还在吗",
+    "继续学习",
+    "我知道了",
+    "继续观看",
+    "确定"
+  ],
+  "human_keywords": [
+    "验证码",
+    "人脸",
+    "活体",
+    "拖动滑块",
+    "确认本人"
+  ],
+  "next_section_keywords": [
+    "下一节",
+    "下一章",
+    "继续学习"
+  ]
 }

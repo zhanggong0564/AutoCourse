@@ -1,11 +1,33 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Callable
 
 from playwright._impl._driver import compute_driver_executable, get_driver_env
+
+
+def resource_root() -> Path:
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    return Path(bundle_root) if bundle_root else Path(__file__).resolve().parent
+
+
+def application_root() -> Path:
+    if getattr(sys, "frozen", False):
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        base = Path(local_app_data) if local_app_data else Path.home() / "AppData" / "Local"
+        return base / "AutoCourseWatcher"
+    return Path(__file__).resolve().parent
+
+
+def prepare_application_root(resource_dir: Path, application_dir: Path) -> None:
+    application_dir.mkdir(parents=True, exist_ok=True)
+    config_path = application_dir / "config.json"
+    if not config_path.exists():
+        shutil.copy2(resource_dir / "config.json", config_path)
 
 
 def configure_browser_path(root: Path) -> Path:

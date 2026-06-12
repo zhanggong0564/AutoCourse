@@ -69,14 +69,71 @@ def has_video(page: Page) -> bool:
 
 
 def play_videos(page: Page) -> None:
-    """把页面内所有 frame 中暂停且未结束的 video 播放起来。"""
+    """确保视频在播放：已在播则什么都不做；暂停则 play()；没有 video 才点启动按钮。
+
+    关键：视频播放中绝不去点控制栏按钮，否则会把它暂停、反复抖动并触发平台报错。
+    """
     for frame in page.frames:
         try:
-            frame.locator("video").evaluate_all(
-                "vs => vs.filter(v => v.paused && !v.ended).forEach(v => v.play())"
+            playing = frame.locator("video").evaluate_all(
+                "vs => vs.some(v => !v.paused && !v.ended && v.readyState > 2)"
             )
         except Exception:
+            playing = False
+        if playing:
+            continue
+
+        try:
+            resumed = frame.locator("video").evaluate_all(
+                "vs => { let n = 0; vs.forEach(v => { if (v.paused && !v.ended) { v.play(); n++; } }); return n; }"
+            )
+        except Exception:
+            resumed = 0
+        if resumed:
+            continue
+
+        # 没有可播放的 video：点 xgplayer 中央大播放按钮启动（它点击后才创建 <video>）
+        for selector in (".xgplayer-start", ".vjs-big-play-button"):
+            try:
+                btn = frame.locator(selector).first
+                if btn.count() and btn.is_visible():
+                    btn.click(timeout=1000)
+                    break
+            except Exception:
+                continue
+
+
+def video_current_time(page: Page) -> float:
+    """返回所有 frame 中 video 的最大 currentTime（秒）；没有 video 返回 0。
+
+    用于判断视频是否真的在推进——比页面显示的百分比可靠（后者每 300 秒才更新）。
+    """
+    best = 0.0
+    for frame in page.frames:
+        try:
+            value = frame.locator("video").evaluate_all(
+                "vs => vs.length ? Math.max(...vs.map(v => v.currentTime || 0)) : 0"
+            )
+            if isinstance(value, (int, float)):
+                best = max(best, float(value))
+        except Exception:
             pass
+    return best
+
+
+def read_player_error(page: Page) -> str:
+    """读取 xgplayer / video.js 错误层的文字，没有则返回空串（用于诊断播放失败）。"""
+    for frame in page.frames:
+        for selector in (".xgplayer-error", ".xgplayer-enter-tips", ".vjs-error-display"):
+            try:
+                el = frame.locator(selector).first
+                if el.count() and el.is_visible():
+                    text = (el.inner_text(timeout=500) or "").strip()
+                    if text:
+                        return " ".join(text.split())
+            except Exception:
+                continue
+    return ""
 
 
 def dismiss_idle_popup(page: Page, config: dict) -> bool:

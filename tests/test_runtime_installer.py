@@ -1,8 +1,29 @@
 import os
+import sys
 
 import pytest
 
 import runtime_installer
+
+
+def test_application_root_uses_local_app_data_when_frozen(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+
+    assert runtime_installer.application_root() == tmp_path / "AutoCourseWatcher"
+
+
+def test_prepare_application_root_copies_default_config(tmp_path):
+    resource_root = tmp_path / "resources"
+    application_root = tmp_path / "data"
+    resource_root.mkdir()
+    (resource_root / "config.json").write_text('{"debug": false}', encoding="utf-8")
+
+    runtime_installer.prepare_application_root(resource_root, application_root)
+
+    assert (application_root / "config.json").read_text(encoding="utf-8") == (
+        '{"debug": false}'
+    )
 
 
 def test_configure_browser_path_uses_application_runtime_directory(

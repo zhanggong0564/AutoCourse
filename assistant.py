@@ -39,7 +39,9 @@ class Assistant:
         self.status("正在启动浏览器")
 
         with sync_playwright() as pw:
-            context = browser.launch_context(pw, profile_dir, self.config["browser"])
+            context = browser.launch_context(
+                pw, profile_dir, self.config["browser"], self.config.get("channel")
+            )
             try:
                 page = context.pages[0] if context.pages else context.new_page()
                 page.goto(self.config["start_url"], wait_until="domcontentloaded")
@@ -139,6 +141,8 @@ class Assistant:
         self.log("课程页面已打开，将按网站正常速度播放。")
         last_progress = ""
         last_change = time.time()
+        last_video_time = -1.0
+        last_heartbeat = 0.0
         poll = self.config["poll_seconds"]
 
         # 调试模式下，课程页一打开就先导出结构（在答题判断之前，避免误判后再也抓不到）。
@@ -171,13 +175,30 @@ class Assistant:
             if page_actions.dismiss_idle_popup(page, self.config):
                 self.log("已自动关闭挂机检测弹窗。")
 
+            player_error = page_actions.read_player_error(page)
+            if player_error:
+                self.log(f"播放器报错：{player_error}")
+
             page_actions.play_videos(page)
+            if not page_actions.has_video(page):
+                self.log("页面暂无可播放的 video 元素（可能需点击播放按钮启动）。")
+
+            # 卡住判断以视频实际播放秒数为准（页面百分比每 300 秒才更新，不可靠）
+            video_time = page_actions.video_current_time(page)
+            if video_time > last_video_time + 1:
+                last_video_time = video_time
+                last_change = time.time()
+
+            # 心跳：每分钟报一次播放位置，方便从日志确认视频确实在推进
+            if time.time() - last_heartbeat >= 60:
+                mins, secs = divmod(int(video_time), 60)
+                self.log(f"视频播放中，当前位置 {mins}:{secs:02d}（{int(video_time)}s）。")
+                last_heartbeat = time.time()
 
             progress = page_logic.parse_progress(text)
             if progress and progress != last_progress:
                 self.log(f"当前进度：{progress}")
                 last_progress = progress
-                last_change = time.time()
 
             if page_logic.is_completed(text, self.config["completed_keywords"]):
                 self.log("当前内容显示已完成。")
@@ -196,11 +217,12 @@ class Assistant:
                     continue
 
             if time.time() - last_change > self.config["stuck_minutes"] * 60:
-                self.log("长时间无进度，刷新页面重试。")
+                self.log(f"视频 {self.config['stuck_minutes']} 分钟无推进（当前 {int(last_video_time)}s），刷新页面重试。")
                 try:
                     page.reload(wait_until="domcontentloaded")
                 except Exception:
                     pass
                 last_change = time.time()
+                last_video_time = -1.0
 
             time.sleep(poll)

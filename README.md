@@ -9,8 +9,9 @@
 ```powershell
 conda activate base
 python -m pip install -r requirements.txt
-python -m playwright install chromium
 ```
+
+开发环境首次运行后，可在界面中点击“安装浏览器组件”下载 Chromium。
 
 ## 使用
 
@@ -19,6 +20,26 @@ python -m playwright install chromium
 3. 保持浏览器打开，程序会自动查找并播放未完成课程。
 4. 出现答题时，界面会显示红色横幅并响提示音；手动作答后程序会自动继续。
 5. 点击“停止”可结束任务并关闭自动化浏览器。
+
+## 构建 EXE
+
+在已配置好的 Miniconda `base` 环境中运行：
+
+```powershell
+conda activate base
+python -m pip install -r requirements.txt
+.\build.ps1
+```
+
+构建结果位于 `dist\自动看课助手.exe`。
+
+## 新电脑首次运行
+
+1. 将 `自动看课助手.exe` 复制到新电脑并直接运行，无需安装 Python 或 Miniconda。
+2. 保持网络连接，点击“安装浏览器组件”。程序会下载 Playwright Chromium，并在日志区域显示进度。
+3. 安装完成后，“打开并开始”按钮会自动启用。
+4. 浏览器组件、配置、日志和登录会话保存在 `%LOCALAPPDATA%\AutoCourseWatcher`。
+5. 安装失败时可查看界面日志或 `%LOCALAPPDATA%\AutoCourseWatcher\logs\app.log`，随后重新点击安装按钮。
 
 ## 配置
 

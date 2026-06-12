@@ -12,7 +12,9 @@ import app_logging
 import runtime_installer
 from assistant import Assistant
 
-ROOT = Path(__file__).resolve().parent
+RESOURCE_ROOT = runtime_installer.resource_root()
+ROOT = runtime_installer.application_root()
+runtime_installer.prepare_application_root(RESOURCE_ROOT, ROOT)
 CONFIG_PATH = ROOT / "config.json"
 
 

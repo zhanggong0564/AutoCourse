@@ -6,3 +6,6 @@ __pycache__/
 *.pyc
 logs/
 .terminal_probe
+runtime/
+build/
+dist/

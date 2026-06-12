@@ -1,2 +1,3 @@
 playwright>=1.52,<2
 pytest>=8,<9
+pyinstaller>=6,<7
