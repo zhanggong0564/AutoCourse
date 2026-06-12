@@ -346,6 +346,13 @@ class App(tk.Tk):
         for tag, color in LOG_LINE_COLORS.items():
             self.log_box.tag_configure(tag, foreground=color)
 
+        self.log_menu = tk.Menu(self.log_box, tearoff=False)
+        self.log_menu.add_command(label="复制", command=self.copy_log)
+        self.log_menu.add_command(label="全选", command=self.select_all_log)
+        self.log_menu.add_separator()
+        self.log_menu.add_command(label="清空日志", command=self.clear_log)
+        self.log_box.bind("<Button-3>", self._show_log_menu)
+
     def _build_status_bar(self):
         bar = tk.Frame(self, bg="#dce5ee", height=26, highlightthickness=0)
         bar.pack(fill="x", side="bottom")
@@ -512,6 +519,28 @@ class App(tk.Tk):
             highlightthickness=1,
         )
         self.footer_status_var.set(text)
+
+    def _show_log_menu(self, event):
+        self.log_menu.tk_popup(event.x_root, event.y_root)
+
+    def copy_log(self):
+        try:
+            text = self.log_box.get("sel.first", "sel.last")
+        except tk.TclError:
+            text = self.log_box.get("1.0", "end-1c")
+        if text:
+            self.clipboard_clear()
+            self.clipboard_append(text)
+
+    def select_all_log(self):
+        self.log_box.focus_set()
+        self.log_box.tag_add("sel", "1.0", "end-1c")
+
+    def clear_log(self):
+        self.log_box.configure(state="normal")
+        self.log_box.delete("1.0", "end")
+        self.log_box.configure(state="disabled")
+        self.last_activity_var.set("最近活动：暂无")
 
     def toggle_log(self):
         self.log_visible = not self.log_visible
