@@ -6,7 +6,7 @@ import threading
 import time
 import tkinter as tk
 from pathlib import Path
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 import app_logging
 import runtime_installer
@@ -16,6 +16,13 @@ RESOURCE_ROOT = runtime_installer.resource_root()
 ROOT = runtime_installer.application_root()
 runtime_installer.prepare_application_root(RESOURCE_ROOT, ROOT)
 CONFIG_PATH = ROOT / "config.json"
+
+STATUS_COLORS = {
+    "success": ("#e6f4ec", "#18734b", "#b9dfca"),
+    "info": ("#e8f1fb", "#295f96", "#bfd2e8"),
+    "warning": ("#fff8e6", "#715b20", "#e6d29b"),
+    "danger": ("#fbeceb", "#a13a32", "#e3b9b6"),
+}
 
 
 def runtime_button_state(installed: bool, installing: bool):
@@ -44,11 +51,13 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("自动看课助手")
-        self.geometry("780x540")
-        self.minsize(700, 460)
+        self.geometry("780x500")
+        self.minsize(720, 430)
+        self.configure(bg="#eef2f6")
         self.events = queue.Queue()
         self.worker = None
         self.runtime_worker = None
+        self.log_visible = False
         self.browser_dir = runtime_installer.configure_browser_path(ROOT)
         self.runtime_installed = runtime_installer.chromium_is_installed(
             self.browser_dir
@@ -57,52 +66,260 @@ class App(tk.Tk):
         self.logger = app_logging.create_app_logger(ROOT)
         self.logger.info("应用启动")
         self.assistant = Assistant(ROOT, self.log, self.set_status)
+        self._configure_styles()
         self._build()
         self._apply_runtime_state()
         self.after(100, self._drain_events)
         self.protocol("WM_DELETE_WINDOW", self._close)
 
+    def _configure_styles(self):
+        style = ttk.Style(self)
+        style.theme_use("clam")
+        style.configure("App.TFrame", background="#eef2f6")
+        style.configure("Toolbar.TFrame", background="#e7eff8")
+        style.configure(
+            "Primary.TButton",
+            background="#397bbf",
+            foreground="white",
+            bordercolor="#356ca8",
+            padding=(10, 4),
+            font=("Microsoft YaHei UI", 9, "bold"),
+        )
+        style.map(
+            "Primary.TButton",
+            background=[("active", "#2f6faa"), ("disabled", "#aab7c5")],
+            foreground=[("disabled", "#eef2f6")],
+        )
+        style.configure(
+            "Tool.TButton",
+            background="#e7eff8",
+            foreground="#273b53",
+            bordercolor="#e7eff8",
+            padding=(8, 4),
+            font=("Microsoft YaHei UI", 9),
+        )
+        style.map(
+            "Tool.TButton",
+            background=[("active", "#d4e2f0"), ("disabled", "#e7eff8")],
+            foreground=[("disabled", "#8792a0")],
+        )
+        style.configure(
+            "Panel.TLabelframe",
+            background="#ffffff",
+            bordercolor="#c7d1dd",
+            relief="solid",
+        )
+        style.configure(
+            "Panel.TLabelframe.Label",
+            background="#dce8f4",
+            foreground="#294967",
+            font=("Microsoft YaHei UI", 9, "bold"),
+            padding=(7, 3),
+        )
+        style.configure("Link.TButton", padding=(4, 1), foreground="#326da8")
+
     def _build(self):
-        container = ttk.Frame(self, padding=18)
-        container.pack(fill="both", expand=True)
-        ttk.Label(
-            container, text="自动看课助手", font=("Microsoft YaHei UI", 18, "bold")
-        ).pack(anchor="w")
-        ttk.Label(
-            container,
-            text="首次启动请在浏览器中手动登录。遇到答题会暂停并提醒，请到浏览器手动作答。",
-            wraplength=720,
-        ).pack(anchor="w", pady=(6, 12))
+        self._build_menu()
+        self._build_toolbar()
+
+        self.main = ttk.Frame(self, style="App.TFrame", padding=(14, 12, 14, 8))
+        self.main.pack(fill="both", expand=True)
 
         self.banner = tk.Label(
-            container,
+            self.main,
             text="",
-            fg="white",
-            bg="#c0392b",
-            font=("Microsoft YaHei UI", 12, "bold"),
-            pady=6,
+            fg="#a13a32",
+            bg="#fbeceb",
+            highlightbackground="#e3b9b6",
+            highlightthickness=1,
+            font=("Microsoft YaHei UI", 10, "bold"),
+            padx=10,
+            pady=8,
+            anchor="w",
         )
 
-        row = ttk.Frame(container)
-        row.pack(fill="x")
-        self.start_button = ttk.Button(row, text="打开并开始", command=self.start)
+        self._build_overview()
+
+        self.hint_label = tk.Label(
+            self.main,
+            text="提示：首次启动后，请在浏览器中手动登录。遇到答题时程序会暂停并提醒。",
+            fg="#715b20",
+            bg="#fff8e6",
+            highlightbackground="#e6d29b",
+            highlightthickness=1,
+            font=("Microsoft YaHei UI", 9),
+            padx=10,
+            pady=7,
+            anchor="w",
+        )
+        self.hint_label.pack(fill="x", pady=(10, 0))
+
+        self._build_log_panel()
+        self._build_status_bar()
+        self._apply_status_presentation("就绪")
+
+    def _build_menu(self):
+        menu = tk.Menu(self)
+
+        file_menu = tk.Menu(menu, tearoff=False)
+        file_menu.add_command(label="打开配置", command=self.open_config)
+        file_menu.add_command(label="打开日志目录", command=self.open_log_folder)
+        file_menu.add_separator()
+        file_menu.add_command(label="退出", command=self._close)
+        menu.add_cascade(label="文件(F)", menu=file_menu)
+
+        run_menu = tk.Menu(menu, tearoff=False)
+        run_menu.add_command(label="开始", command=self.start)
+        run_menu.add_command(label="确认已登录", command=self.confirm_login)
+        run_menu.add_command(label="停止", command=self.stop)
+        menu.add_cascade(label="运行(R)", menu=run_menu)
+
+        tools_menu = tk.Menu(menu, tearoff=False)
+        tools_menu.add_command(label="安装浏览器组件", command=self.install_runtime)
+        tools_menu.add_command(label="打开日志目录", command=self.open_log_folder)
+        menu.add_cascade(label="工具(T)", menu=tools_menu)
+
+        help_menu = tk.Menu(menu, tearoff=False)
+        help_menu.add_command(label="关于", command=self.show_about)
+        menu.add_cascade(label="帮助(H)", menu=help_menu)
+        self.configure(menu=menu)
+
+    def _build_toolbar(self):
+        toolbar = ttk.Frame(self, style="Toolbar.TFrame", padding=(8, 6))
+        toolbar.pack(fill="x")
+
+        self.start_button = ttk.Button(
+            toolbar, text="▶  开始", command=self.start, style="Primary.TButton"
+        )
         self.start_button.pack(side="left")
         self.login_button = ttk.Button(
-            row, text="我已登录", command=self.confirm_login, state="disabled"
+            toolbar,
+            text="✓  已登录",
+            command=self.confirm_login,
+            state="disabled",
+            style="Tool.TButton",
         )
-        self.login_button.pack(side="left", padx=8)
-        self.stop_button = ttk.Button(row, text="停止", command=self.stop, state="disabled")
-        self.stop_button.pack(side="left", padx=8)
-        ttk.Button(row, text="打开配置", command=self.open_config).pack(side="left")
-        self.install_button = ttk.Button(
-            row, text="安装浏览器组件", command=self.install_runtime
+        self.login_button.pack(side="left", padx=(4, 0))
+        self.stop_button = ttk.Button(
+            toolbar,
+            text="■  停止",
+            command=self.stop,
+            state="disabled",
+            style="Tool.TButton",
         )
-        self.install_button.pack(side="left", padx=8)
-        self.status_var = tk.StringVar(value="就绪")
-        ttk.Label(row, textvariable=self.status_var).pack(side="right")
+        self.stop_button.pack(side="left", padx=(4, 0))
 
-        self.log_box = tk.Text(container, height=20, state="disabled", font=("Consolas", 10))
-        self.log_box.pack(fill="both", expand=True, pady=(14, 0))
+        ttk.Separator(toolbar, orient="vertical").pack(
+            side="left", fill="y", padx=7, pady=2
+        )
+        ttk.Button(
+            toolbar, text="⚙  配置", command=self.open_config, style="Tool.TButton"
+        ).pack(side="left")
+        self.install_button = ttk.Button(
+            toolbar,
+            text="↓  安装组件",
+            command=self.install_runtime,
+            style="Tool.TButton",
+        )
+        self.install_button.pack(side="left", padx=(4, 0))
+
+    def _build_overview(self):
+        self.overview = ttk.LabelFrame(
+            self.main, text="运行概览", style="Panel.TLabelframe", padding=(12, 10)
+        )
+        self.overview.pack(fill="x")
+        self.overview.columnconfigure(1, weight=1)
+
+        self.status_var = tk.StringVar(value="就绪")
+        self.component_var = tk.StringVar(value="正在检查")
+        self.task_var = tk.StringVar(value="等待开始")
+
+        labels = (("当前状态：", 0), ("浏览器组件：", 1), ("当前任务：", 2))
+        for text, row in labels:
+            ttk.Label(self.overview, text=text, background="#ffffff").grid(
+                row=row, column=0, sticky="w", padx=(0, 12), pady=4
+            )
+
+        self.status_badge = tk.Label(
+            self.overview,
+            font=("Microsoft YaHei UI", 9, "bold"),
+            padx=8,
+            pady=2,
+            anchor="w",
+        )
+        self.status_badge.grid(row=0, column=1, sticky="w", pady=4)
+        ttk.Label(
+            self.overview, textvariable=self.component_var, background="#ffffff"
+        ).grid(row=1, column=1, sticky="w", pady=4)
+        ttk.Label(
+            self.overview, textvariable=self.task_var, background="#ffffff"
+        ).grid(row=2, column=1, sticky="w", pady=4)
+
+    def _build_log_panel(self):
+        self.log_panel = ttk.LabelFrame(
+            self.main, text="运行日志", style="Panel.TLabelframe", padding=(8, 6)
+        )
+        self.log_panel.pack(fill="x", pady=(10, 0))
+
+        header = ttk.Frame(self.log_panel)
+        header.pack(fill="x")
+        self.last_activity_var = tk.StringVar(value="最近活动：暂无")
+        ttk.Label(header, textvariable=self.last_activity_var).pack(side="left")
+        self.log_toggle_button = ttk.Button(
+            header,
+            text=log_toggle_text(False),
+            command=self.toggle_log,
+            style="Link.TButton",
+        )
+        self.log_toggle_button.pack(side="right")
+
+        self.log_body = ttk.Frame(self.log_panel)
+        scrollbar = ttk.Scrollbar(self.log_body, orient="vertical")
+        self.log_box = tk.Text(
+            self.log_body,
+            height=12,
+            state="disabled",
+            font=("Consolas", 10),
+            bg="#fbfcfd",
+            fg="#243244",
+            relief="solid",
+            borderwidth=1,
+            yscrollcommand=scrollbar.set,
+        )
+        scrollbar.configure(command=self.log_box.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.log_box.pack(side="left", fill="both", expand=True)
+
+    def _build_status_bar(self):
+        bar = tk.Frame(self, bg="#dce5ee", height=26, highlightthickness=0)
+        bar.pack(fill="x", side="bottom")
+        self.footer_status_var = tk.StringVar(value="● 就绪")
+        self.footer_component_var = tk.StringVar(value="浏览器组件正在检查")
+        tk.Label(
+            bar,
+            textvariable=self.footer_status_var,
+            bg="#dce5ee",
+            fg="#18734b",
+            padx=10,
+            font=("Microsoft YaHei UI", 9, "bold"),
+        ).pack(side="left", fill="y")
+        tk.Frame(bar, bg="#b7c3cf", width=1).pack(side="left", fill="y")
+        tk.Label(
+            bar,
+            textvariable=self.footer_component_var,
+            bg="#dce5ee",
+            fg="#33475c",
+            padx=10,
+            font=("Microsoft YaHei UI", 9),
+        ).pack(side="left", fill="y")
+        tk.Label(
+            bar,
+            text="日志：app.log",
+            bg="#dce5ee",
+            fg="#33475c",
+            padx=10,
+            font=("Microsoft YaHei UI", 9),
+        ).pack(side="right", fill="y")
 
     def start(self):
         if self.worker and self.worker.is_alive():
@@ -110,6 +327,7 @@ class App(tk.Tk):
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")
         self.login_button.configure(state="normal")
+        self.task_var.set("启动浏览器并准备课程")
         self.worker = threading.Thread(target=self._run, daemon=True)
         self.worker.start()
 
@@ -157,6 +375,15 @@ class App(tk.Tk):
         self.start_button.configure(state=start_state)
         self.install_button.configure(state=install_state)
         self.status_var.set(status)
+        if self.runtime_installing:
+            component = "正在安装 Chromium"
+        elif self.runtime_installed:
+            component = "Chromium 已安装"
+        else:
+            component = "需要安装 Chromium"
+        self.component_var.set(component)
+        self.footer_component_var.set(component)
+        self._apply_status_presentation(status)
 
     def log(self, message):
         self.logger.info(message)
@@ -177,13 +404,17 @@ class App(tk.Tk):
                 self.log_box.insert("end", time.strftime("[%H:%M:%S] ") + value + "\n")
                 self.log_box.see("end")
                 self.log_box.configure(state="disabled")
+                self.last_activity_var.set(f"最近活动：{value}")
             elif kind == "status":
                 self.status_var.set(value)
+                self.task_var.set(value)
+                self._apply_status_presentation(value)
                 self._update_banner(value)
             elif kind == "buttons":
                 self._apply_runtime_state()
                 self.stop_button.configure(state="disabled")
                 self.login_button.configure(state="disabled")
+                self.task_var.set("等待开始")
             elif kind == "runtime_ready":
                 self.runtime_installing = False
                 self.runtime_installed = True
@@ -198,13 +429,47 @@ class App(tk.Tk):
 
     def _update_banner(self, status):
         if status in ("等待答题", "等待人工处理"):
-            self.banner.configure(text=f"⚠ {status}：请到浏览器手动处理")
-            self.banner.pack(fill="x", pady=(0, 8), before=self.log_box)
+            self.banner.configure(text=f"⚠  {status}：请到浏览器手动处理")
+            self.banner.pack(fill="x", pady=(0, 10), before=self.overview)
         else:
             self.banner.pack_forget()
 
+    def _apply_status_presentation(self, status):
+        kind, text = status_presentation(status)
+        background, foreground, border = STATUS_COLORS[kind]
+        self.status_badge.configure(
+            text=text,
+            bg=background,
+            fg=foreground,
+            highlightbackground=border,
+            highlightthickness=1,
+        )
+        self.footer_status_var.set(text)
+
+    def toggle_log(self):
+        self.log_visible = not self.log_visible
+        if self.log_visible:
+            self.log_panel.pack_configure(fill="both", expand=True)
+            self.log_body.pack(fill="both", expand=True, pady=(6, 0))
+        else:
+            self.log_body.pack_forget()
+            self.log_panel.pack_configure(fill="x", expand=False)
+        self.log_toggle_button.configure(text=log_toggle_text(self.log_visible))
+
     def open_config(self):
         os.startfile(CONFIG_PATH)
+
+    def open_log_folder(self):
+        log_dir = ROOT / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        os.startfile(log_dir)
+
+    def show_about(self):
+        messagebox.showinfo(
+            "关于自动看课助手",
+            "自动看课助手\n\n用于自动播放未完成课程，遇到答题时会暂停并提醒。",
+            parent=self,
+        )
 
     def _close(self):
         self.logger.info("应用关闭")
