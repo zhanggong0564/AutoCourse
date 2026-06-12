@@ -9,10 +9,19 @@ from pathlib import Path
 from tkinter import ttk
 
 import app_logging
+import runtime_installer
 from assistant import Assistant
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "config.json"
+
+
+def runtime_button_state(installed: bool, installing: bool):
+    if installing:
+        return "disabled", "disabled", "正在安装浏览器组件"
+    if installed:
+        return "normal", "disabled", "就绪"
+    return "disabled", "normal", "需要安装浏览器组件"
 
 
 class App(tk.Tk):
@@ -23,10 +32,17 @@ class App(tk.Tk):
         self.minsize(700, 460)
         self.events = queue.Queue()
         self.worker = None
+        self.runtime_worker = None
+        self.browser_dir = runtime_installer.configure_browser_path(ROOT)
+        self.runtime_installed = runtime_installer.chromium_is_installed(
+            self.browser_dir
+        )
+        self.runtime_installing = False
         self.logger = app_logging.create_app_logger(ROOT)
         self.logger.info("应用启动")
         self.assistant = Assistant(ROOT, self.log, self.set_status)
         self._build()
+        self._apply_runtime_state()
         self.after(100, self._drain_events)
         self.protocol("WM_DELETE_WINDOW", self._close)
 
@@ -62,6 +78,10 @@ class App(tk.Tk):
         self.stop_button = ttk.Button(row, text="停止", command=self.stop, state="disabled")
         self.stop_button.pack(side="left", padx=8)
         ttk.Button(row, text="打开配置", command=self.open_config).pack(side="left")
+        self.install_button = ttk.Button(
+            row, text="安装浏览器组件", command=self.install_runtime
+        )
+        self.install_button.pack(side="left", padx=8)
         self.status_var = tk.StringVar(value="就绪")
         ttk.Label(row, textvariable=self.status_var).pack(side="right")
 
@@ -95,6 +115,33 @@ class App(tk.Tk):
         self.assistant.stop()
         self.set_status("正在停止")
 
+    def install_runtime(self):
+        if self.runtime_worker and self.runtime_worker.is_alive():
+            return
+        self.runtime_installing = True
+        self._apply_runtime_state()
+        self.runtime_worker = threading.Thread(
+            target=self._install_runtime_worker, daemon=True
+        )
+        self.runtime_worker.start()
+
+    def _install_runtime_worker(self):
+        try:
+            self.log("开始下载 Chromium 浏览器组件，请保持网络连接。")
+            runtime_installer.install_chromium(self.browser_dir, self.log)
+            self.events.put(("runtime_ready", None))
+        except Exception as exc:
+            self.logger.exception("浏览器组件安装失败")
+            self.events.put(("runtime_failed", str(exc)))
+
+    def _apply_runtime_state(self):
+        start_state, install_state, status = runtime_button_state(
+            self.runtime_installed, self.runtime_installing
+        )
+        self.start_button.configure(state=start_state)
+        self.install_button.configure(state=install_state)
+        self.status_var.set(status)
+
     def log(self, message):
         self.logger.info(message)
         self.events.put(("log", message))
@@ -118,9 +165,19 @@ class App(tk.Tk):
                 self.status_var.set(value)
                 self._update_banner(value)
             elif kind == "buttons":
-                self.start_button.configure(state="normal")
+                self._apply_runtime_state()
                 self.stop_button.configure(state="disabled")
                 self.login_button.configure(state="disabled")
+            elif kind == "runtime_ready":
+                self.runtime_installing = False
+                self.runtime_installed = True
+                self.log("浏览器组件安装完成。")
+                self._apply_runtime_state()
+            elif kind == "runtime_failed":
+                self.runtime_installing = False
+                self.runtime_installed = False
+                self.log(f"浏览器组件安装失败：{value}")
+                self._apply_runtime_state()
         self.after(100, self._drain_events)
 
     def _update_banner(self, status):

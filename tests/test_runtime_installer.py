@@ -36,14 +36,16 @@ def test_install_chromium_runs_bundled_playwright_driver(tmp_path, monkeypatch):
         lambda: ["node.exe", "cli.js", "install", "chromium"],
     )
 
-    class Result:
-        returncode = 0
-        stdout = "download complete"
+    class Process:
+        stdout = iter(["download complete\n"])
+
+        def wait(self):
+            return 0
 
     monkeypatch.setattr(
         runtime_installer.subprocess,
-        "run",
-        lambda command, **kwargs: calls.append((command, kwargs)) or Result(),
+        "Popen",
+        lambda command, **kwargs: calls.append((command, kwargs)) or Process(),
     )
     browser_dir = runtime_installer.configure_browser_path(tmp_path)
     executable = browser_dir / "chromium-1234" / "chrome-win" / "chrome.exe"
@@ -64,12 +66,40 @@ def test_install_chromium_raises_with_installer_output(tmp_path, monkeypatch):
         lambda: ["node.exe", "cli.js", "install", "chromium"],
     )
 
-    class Result:
-        returncode = 1
-        stdout = "network unavailable"
+    class Process:
+        stdout = iter(["network unavailable\n"])
 
-    monkeypatch.setattr(runtime_installer.subprocess, "run", lambda *a, **k: Result())
+        def wait(self):
+            return 1
+
+    monkeypatch.setattr(runtime_installer.subprocess, "Popen", lambda *a, **k: Process())
     browser_dir = runtime_installer.configure_browser_path(tmp_path)
 
     with pytest.raises(RuntimeError, match="network unavailable"):
         runtime_installer.install_chromium(browser_dir)
+
+
+def test_install_chromium_reports_progress_lines(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        runtime_installer,
+        "_playwright_cli_command",
+        lambda: ["node.exe", "cli.js", "install", "chromium"],
+    )
+    browser_dir = runtime_installer.configure_browser_path(tmp_path)
+    executable = browser_dir / "chromium-1234" / "chrome-win" / "chrome.exe"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"")
+
+    class Process:
+        stdout = iter(["downloading\n", "installed\n"])
+
+        def wait(self):
+            return 0
+
+    monkeypatch.setattr(runtime_installer.subprocess, "Popen", lambda *a, **k: Process())
+    progress = []
+
+    output = runtime_installer.install_chromium(browser_dir, progress.append)
+
+    assert progress == ["downloading", "installed"]
+    assert output == "downloading\ninstalled"
