@@ -72,6 +72,12 @@ def _pump_output(
         on_segment(segment)
 
 
+def _clear_partial_download(browser_dir: Path) -> None:
+    for path in browser_dir.glob("chromium-*"):
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+
+
 def _install_chromium_once(
     browser_dir: Path,
     on_progress: Callable[[str], None] | None = None,

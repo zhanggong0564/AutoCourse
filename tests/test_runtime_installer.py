@@ -204,3 +204,27 @@ def test_install_chromium_once_survives_progress_callback_errors(tmp_path, monke
     output = runtime_installer._install_chromium_once(browser_dir, boom)
 
     assert output == "downloading\ninstalled"
+
+
+def test_clear_partial_download_removes_chromium_dirs(tmp_path):
+    browser_dir = tmp_path / "ms-playwright"
+    partial = browser_dir / "chromium-1234" / "chrome-win"
+    partial.mkdir(parents=True)
+    (partial / "partial.bin").write_bytes(b"x")
+    (browser_dir / "chromium-9999").mkdir()
+    keep = browser_dir / "firefox-1"
+    keep.mkdir()
+
+    runtime_installer._clear_partial_download(browser_dir)
+
+    assert not list(browser_dir.glob("chromium-*"))
+    assert keep.is_dir()
+
+
+def test_clear_partial_download_safe_when_empty(tmp_path):
+    browser_dir = tmp_path / "ms-playwright"
+    browser_dir.mkdir()
+
+    runtime_installer._clear_partial_download(browser_dir)
+
+    assert browser_dir.is_dir()
