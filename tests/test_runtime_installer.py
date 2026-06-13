@@ -253,6 +253,7 @@ def test_install_chromium_succeeds_on_second_attempt(tmp_path, monkeypatch):
     assert slept == [2]
     assert "第 1 次下载失败：network reset" in progress
     assert any("第 2 次重试" in line for line in progress)
+    assert any(line.startswith("等待") and "重试" in line for line in progress)
 
 
 def test_install_chromium_raises_after_all_attempts_fail(tmp_path, monkeypatch):
@@ -291,3 +292,26 @@ def test_install_chromium_clears_partial_download_before_retry(tmp_path, monkeyp
 
     assert output == "ok"
     assert seen_partial == [True, False]
+
+
+def test_install_chromium_retry_survives_progress_errors(tmp_path, monkeypatch):
+    browser_dir = runtime_installer.configure_browser_path(tmp_path)
+    attempts = []
+
+    def fake_once(bd, on_progress=None):
+        attempts.append(bd)
+        if len(attempts) == 1:
+            raise RuntimeError("network reset")
+        return "ok"
+
+    monkeypatch.setattr(runtime_installer, "_install_chromium_once", fake_once)
+
+    def boom(_message):
+        raise RuntimeError("logging blew up")
+
+    output = runtime_installer.install_chromium(
+        browser_dir, boom, sleep=lambda _delay: None
+    )
+
+    assert output == "ok"
+    assert len(attempts) == 2

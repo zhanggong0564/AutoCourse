@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import os
@@ -14,6 +15,7 @@ from playwright._impl._driver import compute_driver_executable, get_driver_env
 STALL_TIMEOUT = 60
 MAX_ATTEMPTS = 3
 RETRY_DELAYS = (2, 4)
+assert len(RETRY_DELAYS) == MAX_ATTEMPTS - 1
 
 
 def resource_root() -> Path:
@@ -156,22 +158,26 @@ def install_chromium(
     *,
     sleep: Callable[[float], None] = time.sleep,
 ) -> str:
+    def report(message: str) -> None:
+        if on_progress is not None:
+            try:
+                on_progress(message)
+            except Exception:
+                pass
+
     last_error: Exception | None = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
         if attempt > 1:
-            if on_progress is not None:
-                on_progress("清理未完成的下载文件…")
+            report("清理未完成的下载文件…")
             _clear_partial_download(browser_dir)
             delay = RETRY_DELAYS[attempt - 2]
-            if on_progress is not None:
-                on_progress(f"{delay} 秒后进行第 {attempt} 次重试…")
+            report(f"等待 {delay} 秒后进行第 {attempt} 次重试…")
             sleep(delay)
         try:
             return _install_chromium_once(browser_dir, on_progress)
         except RuntimeError as exc:
             last_error = exc
-            if on_progress is not None:
-                on_progress(f"第 {attempt} 次下载失败：{exc}")
+            report(f"第 {attempt} 次下载失败：{exc}")
     raise RuntimeError(
         f'已重试 {MAX_ATTEMPTS} 次仍失败，可重新点击“安装组件”再试。最后错误：{last_error}'
     )
