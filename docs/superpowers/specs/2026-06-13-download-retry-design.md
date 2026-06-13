@@ -2,7 +2,12 @@
 
 ## 目标
 
-浏览器组件（Chromium）下载经常因网络问题失败。为 `runtime_installer.install_chromium` 增加自动重试，把短暂网络抖动导致的失败自动消化掉，全部重试失败后仍保留现有的手动再点击能力。
+浏览器组件（Chromium）下载经常因网络问题失败，且常见表现是"卡在某个百分比不动"——进程不退出、不报错，只是停滞。为 `runtime_installer.install_chromium` 增加：
+
+1. 失败自动重试，消化短暂网络抖动；
+2. 停滞检测——下载长时间无进展时主动中止，转为一次可重试的失败；
+
+全部重试失败后仍保留现有的手动再点击能力。
 
 ## 范围
 
@@ -10,7 +15,7 @@
 
 ## 架构
 
-把现有 `install_chromium` 的函数体原样抽成私有函数 `_install_chromium_once`（单次尝试：启动 Playwright CLI 子进程、逐行读取输出并回调 `on_progress`、校验返回码与产物、失败抛 `RuntimeError`）。
+把单次下载逻辑收进私有函数 `_install_chromium_once`：启动 Playwright CLI 子进程、**按字符读取输出**并回调 `on_progress`、**带停滞看门狗**、校验返回码与产物、失败（含停滞）抛 `RuntimeError`。输出读取抽成独立的 `_pump_output` 辅助函数以便测试。
 
 `install_chromium` 改为重试包装器，对外签名与行为契约保持兼容：
 
@@ -21,6 +26,18 @@ install_chromium(browser_dir, on_progress=None) -> str
 `app.py` 中 `runtime_installer.install_chromium(self.browser_dir, self.log)` 无需改动即获得重试能力。
 
 单次下载逻辑与重试逻辑由此各自独立、各自可测。
+
+## 停滞检测（解决"卡住不动"）
+
+Playwright 的下载进度条用 `\r` 原地刷新，按行读取（`for line in stdout`）在整个下载期间收不到新行，无法区分"在下载"和"卡死"。因此 `_install_chromium_once` 改为：
+
+- `_pump_output(stream, on_segment, mark_activity)`：从子进程输出流按字符读取，遇 `\r` 或 `\n` 切分出一段非空文本就回调 `on_segment`；**每读到一个字符就调用 `mark_activity()`**。在后台 daemon 线程中运行。
+- 主线程看门狗：记录最近一次活动的单调时钟时间（`time.monotonic`，加锁保护）。循环以 `min(1.0, stall_timeout)` 为间隔 `join` 读取线程；若线程已结束则退出循环；若空闲时间 ≥ `STALL_TIMEOUT` 且进程仍存活（`poll() is None`），判定停滞，`process.kill()` 并标记 `stalled`。
+- 进程结束后：若 `stalled`，抛 `RuntimeError`（消息含"下载超过 N 秒无进展（疑似卡住），已中止本次尝试"）；否则按原有返回码/产物校验。
+
+`STALL_TIMEOUT = 60`（秒）。下载只要还在一点点推进就会刷新进度条、重置计时，慢网不会误杀；真正零进展 60 秒才中止。为便于测试，`stall_timeout` 与 `monotonic` 时钟作为 `_install_chromium_once` 的关键字参数注入，默认取常量与 `time.monotonic`。
+
+停滞被转成 `RuntimeError`，因此自动落入下方的重试逻辑：清理残留 → 等待 → 重新下载。
 
 ## 重试策略
 
@@ -83,10 +100,12 @@ _clear_partial_download(browser_dir):
 
 `tests/test_runtime_installer.py`：
 
-- 现有针对单次行为的用例改为针对 `_install_chromium_once`（行为不变，仅换目标函数）：
+- 现有针对单次行为的用例改为针对 `_install_chromium_once`（用带 `read`/`poll`/`wait`/`kill` 的假进程）：
   - 运行内置 Playwright 驱动并传递 `PLAYWRIGHT_BROWSERS_PATH`
   - 失败时以安装输出抛 `RuntimeError`
-  - 逐行上报进度
+  - 按段上报进度
+  - 停滞中止：输出几个字符后流阻塞、进程不退出，注入小 `stall_timeout` 后抛含"卡住"的 `RuntimeError` 并调用了 `kill`
+- 针对 `_pump_output`：以 `\r`/`\n` 混合的字符串切分出正确段落，且按字符数调用 `mark_activity`
 - 新增针对 `install_chromium` 重试包装器：
   - 第 2 次尝试成功：`_install_chromium_once` 首次抛错、二次成功，最终返回成功输出
   - 3 次全部失败：抛 `RuntimeError`，消息含「已重试 3 次」与最后错误
@@ -97,6 +116,7 @@ _clear_partial_download(browser_dir):
 
 ## 验收标准
 
+- 下载卡住（长时间无进展）时，超过 60 秒自动中止并触发重试，不再无限等待。
 - 下载因网络失败时自动最多重试 3 次，延迟 2、4 秒递增，无需用户干预。
 - 每次失败、清理、重试在日志中有清晰中文提示。
 - 全部重试失败后抛错并提示可手动再点"安装组件"，且安装按钮确实可再次点击。
