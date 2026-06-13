@@ -228,3 +228,66 @@ def test_clear_partial_download_safe_when_empty(tmp_path):
     runtime_installer._clear_partial_download(browser_dir)
 
     assert browser_dir.is_dir()
+
+
+def test_install_chromium_succeeds_on_second_attempt(tmp_path, monkeypatch):
+    browser_dir = runtime_installer.configure_browser_path(tmp_path)
+    attempts = []
+
+    def fake_once(bd, on_progress=None):
+        attempts.append(bd)
+        if len(attempts) == 1:
+            raise RuntimeError("network reset")
+        return "download complete"
+
+    monkeypatch.setattr(runtime_installer, "_install_chromium_once", fake_once)
+    slept = []
+    progress = []
+
+    output = runtime_installer.install_chromium(
+        browser_dir, progress.append, sleep=slept.append
+    )
+
+    assert output == "download complete"
+    assert len(attempts) == 2
+    assert slept == [2]
+    assert "第 1 次下载失败：network reset" in progress
+    assert any("第 2 次重试" in line for line in progress)
+
+
+def test_install_chromium_raises_after_all_attempts_fail(tmp_path, monkeypatch):
+    browser_dir = runtime_installer.configure_browser_path(tmp_path)
+    calls = []
+
+    def always_fail(bd, on_progress=None):
+        calls.append(bd)
+        raise RuntimeError("timeout")
+
+    monkeypatch.setattr(runtime_installer, "_install_chromium_once", always_fail)
+    slept = []
+
+    with pytest.raises(RuntimeError, match="已重试 3 次") as excinfo:
+        runtime_installer.install_chromium(browser_dir, sleep=slept.append)
+
+    assert "timeout" in str(excinfo.value)
+    assert len(calls) == 3
+    assert slept == [2, 4]
+
+
+def test_install_chromium_clears_partial_download_before_retry(tmp_path, monkeypatch):
+    browser_dir = runtime_installer.configure_browser_path(tmp_path)
+    (browser_dir / "chromium-1234").mkdir(parents=True)
+    seen_partial = []
+
+    def fake_once(bd, on_progress=None):
+        seen_partial.append((bd / "chromium-1234").exists())
+        if len(seen_partial) == 1:
+            raise RuntimeError("corrupt")
+        return "ok"
+
+    monkeypatch.setattr(runtime_installer, "_install_chromium_once", fake_once)
+
+    output = runtime_installer.install_chromium(browser_dir, sleep=lambda _delay: None)
+
+    assert output == "ok"
+    assert seen_partial == [True, False]
