@@ -180,3 +180,27 @@ def test_install_chromium_once_aborts_when_download_stalls(tmp_path, monkeypatch
 
     with pytest.raises(RuntimeError, match="卡住"):
         runtime_installer._install_chromium_once(browser_dir, stall_timeout=0.1)
+
+
+def test_install_chromium_once_survives_progress_callback_errors(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        runtime_installer,
+        "_playwright_cli_command",
+        lambda: ["node.exe", "cli.js", "install", "chromium"],
+    )
+    monkeypatch.setattr(
+        runtime_installer.subprocess,
+        "Popen",
+        lambda *a, **k: _FakeProcess("downloading\ninstalled\n"),
+    )
+    browser_dir = runtime_installer.configure_browser_path(tmp_path)
+    executable = browser_dir / "chromium-1234" / "chrome-win" / "chrome.exe"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"")
+
+    def boom(_segment):
+        raise RuntimeError("logging blew up")
+
+    output = runtime_installer._install_chromium_once(browser_dir, boom)
+
+    assert output == "downloading\ninstalled"

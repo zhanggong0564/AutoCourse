@@ -104,7 +104,10 @@ def _install_chromium_once(
     def collect(segment: str) -> None:
         lines.append(segment)
         if on_progress is not None:
-            on_progress(segment)
+            try:
+                on_progress(segment)
+            except Exception:
+                pass
 
     reader = threading.Thread(
         target=_pump_output,
